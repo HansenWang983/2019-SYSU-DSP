@@ -2,17 +2,17 @@ clear;
 
 % 连续信号
 % 时间间隔
-Ts = 2*pi/500;
+Ts = 4*pi/500;
 % 时间序列
-t = -pi:Ts:pi;
+t = -2*pi:Ts:2*pi;
 % 采样点个数
 N = length(t);
 % 1 x N
-f = (1 + cos(t)) / 2;
+f = ((1 + cos(t)) / 2) .* (abs(t) <= pi);
 % 频率采样序列
 k = 0:N-1;
-% w = (2*pi*k)/(N*Ts);
-w = linspace(-2*pi,2*pi,500) ;
+w = (2*pi*k)/(N*Ts);
+% w = linspace(-2*pi,2*pi,500) ;
 %  N x N
 e = exp(-j*t'*w);
 % 1 x N
