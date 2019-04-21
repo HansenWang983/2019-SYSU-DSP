@@ -90,12 +90,12 @@ When the sampling period satisfies T = 1 ， T = p / 2 ， T = 2 , respectively,
 ```matlab
 clear;
 
-dt = 2*pi/500;
+dt = 0.001;
 f0 = 1/(2*pi);
 T0 = 1/f0;
-t = -pi:dt:pi;
+t = -2*pi:dt:2*pi;
 w1 = linspace(-2*pi,2*pi,500);
-f = (1 + cos(2*pi*f0*t)) / 2;
+f = ((1 + cos(2*pi*f0*t)) / 2) .* (abs(t) <= pi);
 F1 = f*exp(-j*t'*w1)*dt;
 subplot(431),plot(t,f);
 axis([min(t)*1.1 max(t)*1.1 min(f)*1.1 max(f)*1.1]);
@@ -113,8 +113,8 @@ Ts = [1 pi/2 2];
 for x = 1:3
     n = -pi:Ts(x):pi;
     w = linspace(-2*pi,2*pi,500);
-    f = (1 + cos(2*pi*f0*n)) / 2;
-    F = f*exp(-j*n'*w)*dt;
+    f = ((1 + cos(2*pi*f0*n)) / 2) .* (abs(n) <= pi);
+    F = f*exp(-j*n'*w)*Ts(x);
     
     subplot(4,3,x*3+1),stem(n,f,'filled');
     axis([min(n)*1.1 max(n)*1.1 min(f)*1.1 max(f)*1.1]);
@@ -125,7 +125,6 @@ for x = 1:3
 
     subplot(4,3,x*3+3),plot(w,angle(F));
     title('相位谱');
-
 end
 ```
 
@@ -135,7 +134,7 @@ end
 
 离散时间信号大多由连续时间信号(模拟信号)抽样获得，时域信号的离散会导致频域的周期延拓，只有满足不低于信号最高频率两倍的采样频率采样，才不会导致频域周期延拓后的混叠，才有可能不失真地恢复源信号。 假设有限带宽信号 xa(t) 的最高频率为 fm，抽样信号 fp(t) 的周期 Ts 及抽样频率 Fs 的取值必须符合奈奎斯特 (Nyquist) 定理：Fs ≥ 2fm，才不会发生混叠现象。
 
-然后由于原信号为非带限信号，没有最大带宽 fm，故三个离散信号的幅度谱均发生了不同程度的混叠，尤其当采样周期为 2 时，频谱出现了镜像对称的部分，且对称点的幅度值明显不为 0 ，说明高频部分混叠到已有低频部分，造成高频消失，这是由于欠采样造成的混叠现象，因此无法重建原信号。
+由于原信号为时限信号，所以为非带限信号，没有最大带宽 fm，故三个离散信号的幅度谱均发生了不同程度的混叠，采样周期越长，其损失的高频成分越多，尤其当采样周期为 2 时，频谱出现了镜像对称的部分，且对称点的幅度值明显不为 0 ，说明高频部分混叠到已有低频部分，造成高频消失，这是由于欠采样造成的混叠现象，因此无法重建原信号。
 
 
 
@@ -211,6 +210,70 @@ end
 结果如下：
 
 ![9](Assets/9.jpg)
+
+
+
+或者直接使用理想低通滤波函数与幅度谱进行乘积，最后逆傅立叶变换还原得到原信号。
+
+代码：
+
+```matlab
+clear;
+
+dt = 4*pi/500;
+f0 = 1/(2*pi);
+T0 = 1/f0;
+t = -2*pi:dt:2*pi;
+% N = length(t);
+% k = 0:N-1;
+% wm = 2*pi*fm;
+% w1 = k*wm/N;
+w1 = linspace(-2*pi,2*pi,500);
+f1 = ((1 + cos(2*pi*f0*t)) / 2) .* (abs(t) <= pi);
+F1 = f1*exp(-j*t'*w1)*dt;
+
+subplot(431),plot(t,f1);
+axis([min(t)*1.1 max(t)*1.1 min(f1)*1.1 max(f1)*1.1]);
+title('原连续信号');
+subplot(432),plot(w1,abs(F1));
+axis([-2*pi*1.1 2*pi*1.1 1.1*min(abs(F1)) 1.1*max(abs(F1))]);
+title('幅度谱');
+
+Ts = [1 pi/2 2];
+% 理想低通滤波器
+w = linspace(-2*pi,2*pi,500);
+dw = 4*pi/500;
+wc = (abs(w) <= 2.4);
+
+for x = 1:3
+    n = -2*pi:Ts(x):2*pi;
+    f = ((1 + cos(2*pi*f0*n)) / 2) .* (abs(n) <= pi);
+    F = f*exp(-j*n'*w)*Ts(x);
+
+    % 与理想低通滤波器相乘进行滤波
+    F = F .* wc;
+
+    % 逆傅立叶变换还原到原信号
+    t = -2*pi:dt:2*pi;
+    xa = real((F*exp(j*w'*t)*dw)) / (2 * pi);
+
+    subplot(4,3,x*3+1),stem(n,f,'filled');
+    axis([min(n)*1.1 max(n)*1.1 min(f)*1.1 max(f)*1.1]);
+    title(['采样周期为',num2str(Ts(x)),'的信号']);
+    
+    subplot(4,3,x*3+2),plot(t,xa);
+    axis([-2*pi*1.1 2*pi*1.1 1.1*min(xa) 1.1*max(xa)]);
+    title('采样后还原信号 fr(t)');
+
+    subplot(4,3,x*3+3),plot(t,abs(xa-f1));
+    axis([-2*pi*1.1 2*pi*1.1 1.1*min(abs(xa-f1)) 1.1*max(abs(xa-f1))]);
+    title('fr(t) 与 f(t) 的绝对误差');
+end
+```
+
+结果如下：
+
+![12](Assets/12.jpg)
 
 发现对于采样周期为 1 和 $\pi/2$ 的离散信号，可以较为准确地重建到原信号，但仍然与原信号存在绝对误差，且后者的绝对误差相比前者的大，这是由于原始的模拟信号 xa（t）不是严格带限产生的，即不存在最高带宽 wm，在频谱图上表示为当 w > wm 时，幅度值为 0，所以低通滤波器的截止频率未能满足：
 
